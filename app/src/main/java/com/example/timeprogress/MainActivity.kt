@@ -3,6 +3,9 @@ package com.example.timeprogress
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
+import androidx.compose.animation.core.FastOutSlowInEasing
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.layout.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -39,18 +42,21 @@ fun TimeProgressScreen() {
 
     var startTime by remember { mutableStateOf<LocalTime?>(null) }
     var endTime by remember { mutableStateOf<LocalTime?>(null) }
+
     val now by produceState(initialValue = LocalDateTime.now()) {
         while (true) {
             value = LocalDateTime.now()
             delay(1000L)
         }
     }
+
     var showStartPicker by remember { mutableStateOf(false) }
     var showEndPicker by remember { mutableStateOf(false) }
+
     val startPickerState = rememberTimePickerState()
     val endPickerState = rememberTimePickerState()
 
-    val progress by remember(startTime, endTime, now) {
+    val rawProgress by remember(startTime, endTime, now) {
         derivedStateOf {
             if (startTime == null || endTime == null) return@derivedStateOf 0f
 
@@ -64,7 +70,7 @@ fun TimeProgressScreen() {
 
             when {
                 now < start -> 0f
-                now >= end -> 1f
+                now >= end   -> 1f
                 else -> {
                     val total = Duration.between(start, end).toMillis().toFloat()
                     val passed = Duration.between(start, now).toMillis().toFloat()
@@ -74,7 +80,17 @@ fun TimeProgressScreen() {
         }
     }
 
-    val percentRemaining = ((1 - progress) * 100).toInt().coerceIn(0, 100)
+    val animatedProgress by animateFloatAsState(
+        targetValue = rawProgress,
+        animationSpec = tween(
+            durationMillis = 800,
+            easing = FastOutSlowInEasing
+        ),
+        label = "progress animation"
+    )
+
+    // درصد را بر اساس مقدار خام (بدون انیمیشن) محاسبه می‌کنیم تا عدد پرش نداشته باشد
+    val percentRemaining = ((1 - rawProgress) * 100).toInt().coerceIn(0, 100)
 
     Scaffold(
         topBar = {
@@ -120,7 +136,7 @@ fun TimeProgressScreen() {
 
             Box(contentAlignment = Alignment.Center, modifier = Modifier.size(260.dp)) {
                 CircularProgressIndicator(
-                    progress = { progress },
+                    progress = { animatedProgress },
                     modifier = Modifier.size(260.dp),
                     strokeWidth = 24.dp,
                     color = MaterialTheme.colorScheme.primary,
@@ -141,8 +157,8 @@ fun TimeProgressScreen() {
                     )
                 }
             }
-            Spacer(modifier = Modifier.height(4.dp))
 
+            Spacer(modifier = Modifier.height(4.dp))
 
             OutlinedButton(onClick = {
                 startTime = null
